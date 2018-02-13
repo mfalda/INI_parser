@@ -1,0 +1,11 @@
+[package]
+name = "INI_parser"
+version = "0.1.0"
+authors = ["mfalda <marco.falda@gmail.com>"]
+
+[dependencies]
+clap = "2"
+ansi_term = "0.9"
+chrono = "0.4"
+url = "1.6.0"
+#curl = "0.4.11"

@@ -1,0 +1,53 @@
+[Genome]
+genus=String
+species=String
+common_name=String
+assemblies=List[String]
+
+    [Genome.assembly]
+    assembly=String
+    ensembl_releases=List[String]
+
+        [Genome.assembly.release]
+        ensembl_release=String
+        # *** download date
+        download_date=Date
+
+        # *** download path at ENSEMBL (genome data)
+        genome_URL=URL
+
+        # *** download path at ENSEMBL (gene annotation data)
+        gene_annotation_URL=URL
+
+        # *** Annotated genes in gtf format
+        GTF_file=File
+
+        # *** Full reference genome with repetitive elements
+        primary_assembly_unmasked=File
+
+        # *** Soft masked genome (DNA satellites and few other ...)
+        primary_assembly_soft_masked=File
+
+        # *** Hard masked genome ( All repetitive elements )
+        primary_assembly_hard_masked=File
+
+        # *** N padded haplotype/patch regions Full reference genome with repetitive elements
+        toplevel_assembly_unmasked*=File
+
+        # *** N padded haplotype/patch regions Soft masked genome (DNA satellites and few other ...)
+        toplevel_assembly_soft_masked*=File
+
+        # *** N padded haplotype/patch regions Hard masked genome ( All repetitive elements )
+        toplevel_assembly_hard_masked*=File
+
+        # *** annotated transcript sequences
+        transcript_sequences*=File
+
+        # *** annotated protein sequences
+        protein_sequences*=File
+
+        # *** indexed files
+        index_blast_path*=Directory
+        index_bwa_path*=Directory
+
+        # *** WORK IN PROGRESS
