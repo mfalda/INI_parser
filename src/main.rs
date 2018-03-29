@@ -190,7 +190,7 @@ fn check_type(val: &str, type_: &str) -> Result<bool, String>
             match Url::parse(val) {
                 Ok(_) =>
                     Ok(true),
-                Err(err) =>
+                Err(_err) =>
                     Err(format!("URL '{}' is malformed", val))
             }
         },
@@ -216,7 +216,7 @@ fn card(num: usize) -> String
     }
 }
 
-fn check_typed_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &Vec<HNode>) -> Result<bool, Vec<String>>
+fn check_typed_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &[HNode]) -> Result<bool, Vec<String>>
 {
     let mut errors = Vec::new();
 
@@ -245,7 +245,7 @@ fn check_typed_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &Vec
         }
     }
 
-    if errors.len() == 0 {
+    if errors.is_empty() {
         Ok(true)
     }
     else {
@@ -253,7 +253,7 @@ fn check_typed_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &Vec
     }
 }
 
-fn check_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &Vec<HNode>) -> Result<bool, Vec<String>>
+fn check_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &[HNode]) -> Result<bool, Vec<String>>
 {
     let mut errors = Vec::new();
 
@@ -276,7 +276,7 @@ fn check_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &Vec<HNode
         }
     };
 
-    if errors.len() == 0 {
+    if errors.is_empty() {
         Ok(true)
     }
     else {
@@ -326,12 +326,12 @@ fn real_main() -> i32
 
     // check if all mandatory template entries are in the INI file and possibly their type
 
-    println!("");
+    println!();
 
     let mut num_errors = 0;
     for (s, (te, e)) in sections.iter().zip(tmpl_entries.iter().zip(&entries)) {
         println!("Checking section '{}'", s);
-        let chk = check_typed_entries(&s, vrb, &te[0], &e);
+        let chk = check_typed_entries(s, vrb, &te[0], e);
         match chk {
             Ok(_) =>
                 (),
@@ -340,7 +340,7 @@ fn real_main() -> i32
                 num_errors += err.len()
             }
         }
-        let chk = check_entries(&s, vrb, &te[0], &e);
+        let chk = check_entries(s, vrb, &te[0], e);
         match chk {
             Ok(_) =>
                 println!("    {}", Green.paint("• the section is well-formed")),
