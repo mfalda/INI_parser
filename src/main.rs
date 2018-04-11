@@ -1,6 +1,8 @@
 extern crate clap;
 use clap::{Arg, App};
 
+extern crate crossbeam;
+
 use std::io::BufReader;
 use std::io::BufRead;
 use std::fs::File;
@@ -286,7 +288,7 @@ fn check_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &[HNode]) 
 
 fn real_main() -> i32
 {
-    let matches = App::new("INI parser")
+    let matches = App::new("INI validator")
         .version("0.1")
         .author("Author: M. Falda")
         .about("Validate an INI file according to a template")
@@ -329,36 +331,39 @@ fn real_main() -> i32
     println!();
 
     let mut num_errors = 0;
-    for (s, (te, e)) in sections.iter().zip(tmpl_entries.iter().zip(&entries)) {
-        println!("Checking section '{}'", s);
-        let chk = check_typed_entries(s, vrb, &te[0], e);
-        match chk {
-            Ok(_) =>
-                (),
-            Err(err) => {
-                eprintln!("    {}", err.join("\n    "));
-                num_errors += err.len()
-            }
-        }
-        let chk = check_entries(s, vrb, &te[0], e);
-        match chk {
-            Ok(_) =>
-                println!("    {}", Green.paint("• the section is well-formed")),
-            Err(err) => {
-                eprintln!("    {}", err.join("\n    "));
-                num_errors += err.len()
-            }
-        }
-    };
 
-    if num_errors == 0 {
-        println!("\nThe INI file is well-formed.\n");
-        0
-    }
-    else {
-        eprintln!("\nThere are {} errors!\n", num_errors);
-        1
-    }
+    crossbeam::scope(|scope| {
+        for (s, (te, e)) in sections.iter().zip(tmpl_entries.iter().zip(&entries)) {
+            println!("Checking section '{}'", s);
+            let handle1: crossbeam::ScopedJoinHandle<Result<bool, Vec<String>>> = scope.spawn(move || {
+                check_typed_entries(s, vrb, &te[0], e)
+            });
+            let handle2: crossbeam::ScopedJoinHandle<Result<bool, Vec<String>>> = scope.spawn(move || {
+                check_entries(s, vrb, &te[0], e)
+            });
+            let res1: Result<bool, Vec<String>> = handle1.join();
+            let res2: Result<bool, Vec<String>> = handle2.join();
+
+            match res1 {
+                Ok(_) =>
+                    (),
+                Err(err) => {
+                    eprintln!("    {}", err.join("\n    "));
+                    num_errors += err.len()
+                }
+            }
+
+            match res2 {
+                Ok(_) =>
+                    println!("    {}", Green.paint("• the section is well-formed")),
+                Err(err) => {
+                    eprintln!("    {}", err.join("\n    "));
+                    num_errors += err.len()
+                }
+            }
+        }
+    });
+    0
 }
 
 fn main()
