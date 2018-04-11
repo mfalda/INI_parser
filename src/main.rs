@@ -363,7 +363,15 @@ fn real_main() -> i32
             }
         }
     });
-    0
+
+    if num_errors == 0 {
+        println!("\nThe INI file is well-formed.\n");
+        0
+    }
+    else {
+        eprintln!("\nThere are {} errors!\n", num_errors);
+        1
+    }
 }
 
 fn main()
