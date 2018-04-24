@@ -19,12 +19,20 @@ extern crate url;
 use url::Url;
 
 
+#[derive(Debug, PartialEq)]
+enum Order {
+    ASC,
+    DESC,
+    NONE
+}
+
 #[derive(Debug)]
 struct Node {
     key: String,
     value: String,
     line: i32,
-    optional: bool
+    optional: bool,
+    order: Order
 }
 
 type HNode = HashMap<String, Node>;
@@ -84,11 +92,27 @@ fn read_ini<'a>(inp: &str, vrb: bool, sections: &'a mut Vec<String>) -> (Vec<Vec
                 if vrb {
                     println!("READING '{:?}'", kv);
                 }
-                let (k, opt) = if kv[0].ends_with('*') {
-                    (&kv[0][0..kv[0].len() - 1], true)
-                } else {
-                    (kv[0], false)
-                };
+                let (k, opt, dir) = if kv[0].ends_with('*') {
+                                                           if vrb {
+                                                             println!("\tthis key is optional");
+                                                           }
+                                                           (&kv[0][0..kv[0].len() - 1], true, Order::NONE)
+                                                      }
+                                                      else if kv[0].ends_with('>') {
+                                                          if vrb {
+                                                              println!("\tthese keys must be in descending order");
+                                                          }
+                                                          (&kv[0][0..kv[0].len() - 1], false, Order::DESC)
+                                                      }
+                                                      else if kv[0].ends_with('<') {
+                                                          if vrb {
+                                                              println!("\tthese keys must be in ascending order");
+                                                          }
+                                                          (&kv[0][0..kv[0].len() - 1], false, Order::ASC)
+                                                      }
+                                                      else {
+                                                          (kv[0], false, Order::NONE)
+                                                      };
                 debug_assert!(entries.len() > level - 1, format!("Entries size = {} <= {} = level - 1",
                                                               entries.len(), level - 1));
                 debug_assert!(entry_index.len() > level - 1, format!("Entry indices size = {} <= {} = level - 1",
@@ -98,7 +122,7 @@ fn read_ini<'a>(inp: &str, vrb: bool, sections: &'a mut Vec<String>) -> (Vec<Vec
                                       level, entries[level - 1].len() >= entry_index[level - 1] - 1, level));
                 entries[level - 1][entry_index[level - 1] - 1].insert(k.to_string(),
                                             Node { key: k.to_string(), value: kv[1].to_string(),
-                                                line: line_num, optional: opt });
+                                                line: line_num, optional: opt, order: dir });
             }
         }
         line1.clear();
@@ -199,6 +223,22 @@ fn check_type(val: &str, type_: &str) -> Result<bool, String>
     }
 }
 
+/// Return a cardinality suffix next a number
+///
+/// # Arguments
+///
+/// * `num` - The input number.
+///
+/// ```
+/// assert_eq!(card(1), "1st");
+/// assert_eq!(card(2), "2nd");
+/// assert_eq!(card(3), "3rd");
+/// assert_eq!(card(4), "4th");
+/// assert_eq!(card(51), "51st");
+/// assert_eq!(card(52), "52nd");
+/// assert_eq!(card(53), "53rd");
+/// assert_eq!(card(54), "54th");
+/// ```
 #[inline]
 fn card(num: usize) -> String
 {
@@ -219,6 +259,7 @@ fn card(num: usize) -> String
 fn check_typed_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &[HNode]) -> Result<bool, Vec<String>>
 {
     let mut errors = Vec::new();
+    let mut last_num = 0;
 
     for (num, entries) in entries.into_iter().enumerate() {
         if vrb {
@@ -231,9 +272,27 @@ fn check_typed_entries(sec: &str, vrb: bool, tmpl_entries: &HNode, entries: &[HN
                         println!("    {}: {} = {:?} at line {}", tmpl_key, tmpl_value.value, value.value, value.line);
                     }
                     let chk = check_type(&value.value, &tmpl_value.value).map(|_|Ok(true))
-                        .unwrap_or_else(|err| Err(Yellow.paint(format!("• Type error at line {}: {}!", value.line, err)).to_string()));
+                        .unwrap_or_else(|err| Err(Yellow.paint(format!("• Type error at line {}: {}!",
+                                                                       value.line, err)).to_string()));
                     if chk.is_err() {
                         errors.push(chk.unwrap_err())
+                    }
+                    if tmpl_value.order != Order::NONE {
+                        let current_num = value.value.parse::<i32>().unwrap_or(0);
+                        if vrb {
+                            println!("Found an ordered number (order: {:?}) corresponding to key {} and value {} at line {} (last number was {})",
+                                     tmpl_value.order, value.key, current_num, value.line, last_num);
+                        }
+                        if last_num > 0 {
+                            if tmpl_value.order == Order::ASC && current_num < last_num {
+                                errors.push(Yellow.paint(format!("• Value for key '{}' in the {} section '{}' is not in increasing order: {} > {} (see line {} in the template)!",
+                                                                 tmpl_key, card(num + 1), sec, current_num, last_num, tmpl_value.line)).to_string())
+                            } else if tmpl_value.order == Order::DESC && current_num > last_num {
+                                errors.push(Yellow.paint(format!("• Value for key '{}' in the {} section '{}' is not in decreasing order: {} > {} (see line {} in the template)!",
+                                                                 tmpl_key, card(num + 1), sec, current_num, last_num, tmpl_value.line)).to_string())
+                            }
+                        }
+                        last_num = current_num;
                     }
                 },
                 None if !tmpl_value.optional =>
